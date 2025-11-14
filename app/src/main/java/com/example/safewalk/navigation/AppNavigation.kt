@@ -1,36 +1,37 @@
 package com.example.safewalk.navigation
 
-import com.example.safewalk.ui.SplashScreen
-
-
-
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.safewalk.ui.ComunityScreen
-import com.example.safewalk.ui.HomeScreen
-import com.example.safewalk.ui.LoginScreen
-import com.example.safewalk.ui.NewReportScreen
-
-import com.example.safewalk.ui.OnboardingScreen1
-import com.example.safewalk.ui.OnboardingScreen2
-import com.example.safewalk.ui.ProfileScreen
-
-import com.example.safewalk.ui.RegisterScreen
-import com.example.safewalk.ui.ReportScreen
-import com.example.safewalk.ui.ReportSegmentScreen
+import com.example.safewalk.ui.*
+import com.example.safewalk.viewmodel.AuthViewModel
+import com.example.safewalk.viewmodel.SegmentViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    hasSeenOnboarding: Boolean,
+    isLoggedIn: Boolean                 // 👈 agregado
+) {
     val navController = rememberNavController()
+    val segmentViewModel: SegmentViewModel = viewModel()
+    val authViewModel: AuthViewModel = viewModel()
 
-    NavHost(navController = navController, startDestination = "splash") {
+    // 🔥 LÓGICA REAL DE NAVEGACIÓN
+    val startDestination =
+        when {
+            !hasSeenOnboarding -> "splash"       // aún no vio onboarding
+            isLoggedIn -> "home"                 // sesión iniciada → directo al home
+            else -> "loginScreen"                // vio onboarding pero no está logueado
+        }
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination
+    ) {
+
         composable("splash") {
             SplashScreen(onStartClick = {
                 navController.navigate("onboarding1") {
@@ -49,6 +50,11 @@ fun AppNavigation() {
 
         composable("onboarding2") {
             OnboardingScreen2(onNextClick = {
+
+                // Guardar en SharedPreferences
+                val prefs = navController.context.getSharedPreferences("my_prefs", 0)
+                prefs.edit().putBoolean("hasSeenOnboarding", true).apply()
+
                 navController.navigate("comunity") {
                     popUpTo("onboarding2") { inclusive = true }
                 }
@@ -56,46 +62,32 @@ fun AppNavigation() {
         }
 
         composable("comunity") {
-            ComunityScreen(onNextClick = {
-                navController.navigate("registerScreen") {
-                    popUpTo("comunity") { inclusive = true }
-                }
-            })
+            ComunityScreen(onNextClick = { navController.navigate("registerScreen") })
         }
 
-
-
-
-
-
         composable("loginScreen") {
-            LoginScreen(navController = navController)  // pasás el navController
+            LoginScreen(navController)
         }
 
         composable("registerScreen") {
-            RegisterScreen(navController = navController)  // pasás el navController
+            RegisterScreen(navController, authViewModel)
         }
 
         composable("reportScreen") {
-            ReportScreen(navController = navController)  // pasás el navController
+            ReportScreen(navController, segmentViewModel)
         }
 
         composable("profileScreen") {
-            ProfileScreen(navController = navController)  // pasás el navController
+            ProfileScreen(navController)
         }
 
         composable("newReportScreen") {
-            NewReportScreen(navController = navController)  // pasás el navController
+            NewReportScreen(navController, segmentViewModel)
         }
 
         composable("reportSegmentScreen") {
-            ReportSegmentScreen(navController = navController)  // pasás el navController
+            ReportSegmentScreen(navController)
         }
-
-
-
-
-
 
         composable("home") {
             HomeScreen(navController)

@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,8 +45,8 @@ import com.example.safewalk.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportSegmentScreen(navController: NavController) {
-    var puntoA by remember { mutableStateOf("") }
-    var puntoB by remember { mutableStateOf("") }
+    var puntoA by rememberSaveable { mutableStateOf("") }
+    var puntoB by rememberSaveable { mutableStateOf("") }
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
