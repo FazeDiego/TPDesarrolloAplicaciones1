@@ -51,7 +51,7 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
 
 
     val context = LocalContext.current
-    val placesClient = rememberSaveable { Places.createClient(context) }
+    val placesClient = remember { Places.createClient(context) }
 
     val focusManager = LocalFocusManager.current
 

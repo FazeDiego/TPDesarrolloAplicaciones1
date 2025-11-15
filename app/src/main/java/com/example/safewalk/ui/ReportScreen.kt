@@ -47,15 +47,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.safewalk.R
 import com.example.safewalk.data.FirestoreRepository
+import com.example.safewalk.model.Review
 import com.example.safewalk.model.Tramo
 import com.example.safewalk.viewmodel.SegmentViewModel
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.GeoPoint
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen(navController: NavController, segmentViewModel: SegmentViewModel) {
-
 
 
     val puntoA = segmentViewModel.puntoA
@@ -71,7 +73,14 @@ fun ReportScreen(navController: NavController, segmentViewModel: SegmentViewMode
         containerColor = Color.White,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Reportar Segmento", color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "Reportar Segmento",
+                        color = Color.Black,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigate("home") }) {
                         Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.Black)
@@ -150,31 +159,119 @@ fun ReportScreen(navController: NavController, segmentViewModel: SegmentViewMode
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Botón de confirmar
             Button(
                 onClick = {
                     if (puntoA != null && puntoB != null) {
-                        val tramo = Tramo(
-                            puntoA = GeoPoint(puntoA.latitude, puntoA.longitude),
-                            puntoB = GeoPoint(puntoB.latitude, puntoB.longitude),
-                            usuarioId = "TEST_USER"
-                        )
 
+                        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "UNKNOWN_USER"
+                        val repo = FirestoreRepository()
 
-                        Log.d("REPORT", "Enviando tramo: $tramo")
+                        val geoA = GeoPoint(puntoA.latitude, puntoA.longitude)
+                        val geoB = GeoPoint(puntoB.latitude, puntoB.longitude)
 
-                        repo.guardarTramo(tramo) { ok ->
-                            Log.d("REPORT", "Resultado guardarTramo: $ok")
-                            if (ok) {
-                                navController.navigate("home")
+                        Log.d("REPORT", "Buscando tramo existente...")
+
+                        // 1️⃣ Buscar si existe un tramo cercano
+                        repo.buscarTramoExistente(geoA, geoB) { tramoExistenteId ->
+
+                            if (tramoExistenteId != null) {
+                                // -------------------------------------------------------
+                                // 🤝 TRAMO ENCONTRADO → solo guardamos review y promedio
+                                // -------------------------------------------------------
+                                Log.d("REPORT", "Tramo existente encontrado: $tramoExistenteId")
+
+                                val review = Review(
+                                    comentario = comment,
+                                    fecha = Timestamp.now(),
+                                    rating = rating,
+                                    tramoId = tramoExistenteId,
+                                    usuarioId = userId
+                                )
+
+                                repo.guardarReview(review) { ok ->
+                                    if (ok) {
+                                        repo.actualizarEstadisticasTramo(tramoExistenteId, rating)
+
+                                        Toast.makeText(
+                                            navController.context,
+                                            "Reseña agregada correctamente",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+
+                                        navController.navigate("home")
+                                    } else {
+                                        Toast.makeText(
+                                            navController.context,
+                                            "Error al guardar reseña",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+
                             } else {
-                                Toast.makeText(
-                                    navController.context,
-                                    "Error al guardar tramo",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                // -------------------------------------------------------
+                                // 🆕 NO EXISTE → crear nuevo tramo
+                                // -------------------------------------------------------
+                                Log.d("REPORT", "No existe tramo → creando uno nuevo")
+
+                                val tramoNuevo = Tramo(
+                                    uuid = "", // repositorio lo reemplaza por el doc.id
+                                    puntoA = geoA,
+                                    puntoB = geoB,
+                                    usuarioId = userId,
+                                    ratingPromedio = 0.0,
+                                    cantidadReviews = 0
+                                )
+
+                                repo.guardarTramo(tramoNuevo) { nuevoTramoId ->
+                                    if (nuevoTramoId != null) {
+
+                                        // Crear review asociada al nuevo tramo
+                                        val review = Review(
+                                            comentario = comment,
+                                            fecha = Timestamp.now(),
+                                            rating = rating,
+                                            tramoId = nuevoTramoId,
+                                            usuarioId = userId
+                                        )
+
+                                        repo.guardarReview(review) { ok ->
+                                            if (ok) {
+
+                                                // Actualizar promedio y cantidad
+                                                repo.actualizarEstadisticasTramo(
+                                                    nuevoTramoId,
+                                                    rating
+                                                )
+
+                                                Toast.makeText(
+                                                    navController.context,
+                                                    "Reporte enviado correctamente",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+
+                                                navController.navigate("home")
+
+                                            } else {
+                                                Toast.makeText(
+                                                    navController.context,
+                                                    "Error al guardar reseña",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+
+                                    } else {
+                                        Toast.makeText(
+                                            navController.context,
+                                            "Error al guardar tramo",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
                             }
                         }
+
                     } else {
                         Log.d("REPORT", "puntoA o puntoB nulos")
                     }
@@ -182,7 +279,6 @@ fun ReportScreen(navController: NavController, segmentViewModel: SegmentViewMode
             ) {
                 Text("Enviar Reporte")
             }
-
         }
     }
 }

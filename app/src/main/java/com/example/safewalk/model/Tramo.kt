@@ -5,16 +5,24 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
 data class Tramo(
+    var uuid: String = "",
     val puntoA: GeoPoint = GeoPoint(0.0, 0.0),
     val puntoB: GeoPoint = GeoPoint(0.0, 0.0),
-    val usuarioId: String = ""
+    val usuarioId: String = "",
+    var ratingPromedio: Double = 0.0,
+    var cantidadReviews: Int = 0
 )
 
 
-fun guardarTramo(tramo: Tramo, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+fun guardarTramo(tramo: Tramo, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
     val db = Firebase.firestore
-    db.collection("tramos")
-        .add(tramo)
-        .addOnSuccessListener { onSuccess() }
-        .addOnFailureListener { exception -> onFailure(exception) }
+
+    val nuevoDoc = db.collection("tramos").document()
+
+    tramo.uuid = nuevoDoc.id
+
+    nuevoDoc
+        .set(tramo)
+        .addOnSuccessListener { onSuccess(nuevoDoc.id) }
+        .addOnFailureListener { e -> onFailure(e) }
 }
