@@ -80,17 +80,30 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
             .addOnFailureListener { onResult(emptyList()) }
     }
 
-    // Obtener coordenadas
-    fun fetchLatLng(prediction: AutocompletePrediction, onResult: (LatLng?) -> Unit) {
+    // Obtener coordenadas y componente 'route' (nombre de la calle)
+    fun fetchPlaceDetails(prediction: AutocompletePrediction, onResult: (LatLng?, String?) -> Unit) {
         val placeId = prediction.placeId
-        val request = FetchPlaceRequest.newInstance(placeId, listOf(Place.Field.LAT_LNG))
+        val request = FetchPlaceRequest.newInstance(placeId, listOf(Place.Field.LAT_LNG, Place.Field.ADDRESS_COMPONENTS))
 
         placesClient.fetchPlace(request)
             .addOnSuccessListener { response ->
-                onResult(response.place.latLng)
+                val place = response.place
+                val latLng = place.latLng
+                var routeName: String? = null
+                try {
+                    val comps = place.addressComponents?.asList()
+                    if (!comps.isNullOrEmpty()) {
+                        val routeComp = comps.firstOrNull { comp -> comp.types.contains("route") }
+                        routeName = routeComp?.name
+                    }
+                } catch (e: Exception) {
+                    // ignore, fallback later
+                }
+
+                onResult(latLng, routeName)
             }
             .addOnFailureListener {
-                onResult(null)
+                onResult(null, null)
             }
     }
 
@@ -160,7 +173,11 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
                         suggestionsA = emptyList()
                         focusManager.clearFocus()
 
-                        fetchLatLng(suggestion) { puntoALatLng = it }
+                        // obtener lat/lng y nombre de la calle (route) y guardarlo en el ViewModel
+                        fetchPlaceDetails(suggestion) { latLng, routeName ->
+                            puntoALatLng = latLng
+                            segmentViewModel.nombreCalleA = routeName ?: suggestion.getFullText(null).toString()
+                        }
                     }
                 ) {
                     Text(suggestion.getFullText(null).toString(), color = Color.Black)
@@ -197,7 +214,11 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
                         puntoB = suggestion.getFullText(null).toString()
                         suggestionsB = emptyList()
                         focusManager.clearFocus()
-                        fetchLatLng(suggestion) { puntoBLatLng = it }
+
+                        fetchPlaceDetails(suggestion) { latLng, routeName ->
+                            puntoBLatLng = latLng
+                            segmentViewModel.nombreCalleB = routeName ?: suggestion.getFullText(null).toString()
+                        }
                     }
                 ) {
                     Text(suggestion.getFullText(null).toString(), color = Color.Black)
@@ -258,8 +279,11 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
             // ---------------- BOTÓN ----------------
             Button(
                 onClick = {
+                    // Guardar coordenadas y nombres en el ViewModel (fallback si no se resolvió antes)
                     segmentViewModel.puntoA = puntoALatLng
                     segmentViewModel.puntoB = puntoBLatLng
+                    if (segmentViewModel.nombreCalleA.isBlank()) segmentViewModel.nombreCalleA = puntoA
+                    if (segmentViewModel.nombreCalleB.isBlank()) segmentViewModel.nombreCalleB = puntoB
                     navController.navigate("reportScreen") },
 
                 colors = ButtonDefaults.buttonColors(

@@ -220,7 +220,9 @@ fun ReportScreen(navController: NavController, segmentViewModel: SegmentViewMode
                                     puntoB = geoB,
                                     usuarioId = userId,
                                     ratingPromedio = 0.0,
-                                    cantidadReviews = 0
+                                    cantidadReviews = 0,
+                                    nombreCalleA = segmentViewModel.nombreCalleA,
+                                    nombreCalleB = segmentViewModel.nombreCalleB
                                 )
 
                                 repo.guardarTramo(tramoNuevo) { nuevoTramoId ->

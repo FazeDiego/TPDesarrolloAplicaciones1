@@ -94,6 +94,12 @@ dependencies {
     // Firebase Auth
     implementation("com.google.firebase:firebase-auth-ktx")
 
+    // Firebase Storage
+    implementation("com.google.firebase:firebase-storage-ktx")
+
+    // Coil for image loading in Compose
+    implementation("io.coil-kt:coil-compose:2.4.0")
+
 
 
 }

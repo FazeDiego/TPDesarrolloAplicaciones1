@@ -29,8 +29,12 @@ class MainActivity : ComponentActivity() {
         // ⚡ Detecta si hay usuario con sesión activa en Firebase
         val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
 
+        // Leer preferencia de tema (claro/oscuro)
+        val prefs = getSharedPreferences("my_prefs", MODE_PRIVATE)
+        val useDarkTheme = prefs.getBoolean("useDarkTheme", false)
+
         setContent {
-            SafeWalkTheme {
+            SafeWalkTheme(darkTheme = useDarkTheme) {
                 AppNavigation(
                     hasSeenOnboarding = hasSeenOnboarding,
                     isLoggedIn = isLoggedIn

@@ -9,5 +9,7 @@ import com.google.android.gms.maps.model.LatLng
 class SegmentViewModel : ViewModel() {
     var puntoA by mutableStateOf<LatLng?>(null)
     var puntoB by mutableStateOf<LatLng?>(null)
+    var nombreCalleA by mutableStateOf("")
+    var nombreCalleB by mutableStateOf("")
 }
 
