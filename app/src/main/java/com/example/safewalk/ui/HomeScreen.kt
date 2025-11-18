@@ -44,6 +44,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.maps.android.compose.*
+import com.example.safewalk.data.network.snapToRoads
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -212,12 +213,29 @@ fun HomeScreen(navController: NavController, themeViewModel: ThemeViewModel) {
                         val (colorLinea, etiqueta) = tramoVisual(tramo.ratingPromedio)
 
                         // Línea entre A y B
-                        Polyline(
-                            points = listOf(pA, pB),
-                            color = colorLinea,
-                            width = 8f,
-                            geodesic = true
-                        )
+                        val apiKey = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjU2NWI0OGM0M2I4NDRkMmFhZWRiOWE3ZjZlYzYyNzNhIiwiaCI6Im11cm11cjY0In0="
+
+                        var snappedPoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
+
+                        LaunchedEffect(tramo.uuid) {
+                            snappedPoints = snapToRoads(pA, pB, apiKey)
+                        }
+
+                        if (snappedPoints.isNotEmpty()) {
+                            Polyline(
+                                points = snappedPoints,
+                                color = colorLinea,
+                                width = 8f
+                            )
+                        } else {
+                            // Fallback por si la API falla
+                            Polyline(
+                                points = listOf(pA, pB),
+                                color = colorLinea,
+                                width = 8f,
+                                geodesic = true
+                            )
+                        }
 
                         // Marcadores suaves
                         Circle(
