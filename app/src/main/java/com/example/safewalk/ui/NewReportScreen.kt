@@ -1,14 +1,12 @@
 package com.example.safewalk.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -18,18 +16,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.safewalk.viewmodel.SegmentViewModel
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
 
 // MAPS
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 
 // PLACES
@@ -38,17 +32,12 @@ import com.google.android.libraries.places.api.model.AutocompletePrediction
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.maps.android.compose.Circle
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewModel) {
-
-    val db = FirebaseFirestore.getInstance()
-
-
 
     val context = LocalContext.current
     val placesClient = remember { Places.createClient(context) }
@@ -80,28 +69,41 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
             .addOnFailureListener { onResult(emptyList()) }
     }
 
-    // Obtener coordenadas
-    fun fetchLatLng(prediction: AutocompletePrediction, onResult: (LatLng?) -> Unit) {
+    // Obtener coordenadas y componente 'route' (nombre de la calle)
+    fun fetchPlaceDetails(prediction: AutocompletePrediction, onResult: (LatLng?, String?) -> Unit) {
         val placeId = prediction.placeId
-        val request = FetchPlaceRequest.newInstance(placeId, listOf(Place.Field.LAT_LNG))
+        val request = FetchPlaceRequest.newInstance(placeId, listOf(Place.Field.LAT_LNG, Place.Field.ADDRESS_COMPONENTS))
 
         placesClient.fetchPlace(request)
             .addOnSuccessListener { response ->
-                onResult(response.place.latLng)
+                val place = response.place
+                val latLng = place.latLng
+                var routeName: String? = null
+                try {
+                    val comps = place.addressComponents?.asList()
+                    if (!comps.isNullOrEmpty()) {
+                        val routeComp = comps.firstOrNull { comp -> comp.types.contains("route") }
+                        routeName = routeComp?.name
+                    }
+                } catch (e: Exception) {
+                    // ignore, fallback later
+                }
+
+                onResult(latLng, routeName)
             }
             .addOnFailureListener {
-                onResult(null)
+                onResult(null, null)
             }
     }
 
     Scaffold(
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
                         text = "Seleccionar puntos de Ruta",
-                        color = Color.Black,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -109,16 +111,16 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
                 navigationIcon = {
                     IconButton(onClick = { navController.navigate("home") }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Volver",
-                            tint = Color.Black
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = Color.Black,
-                    navigationIconContentColor = Color.Black
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -132,7 +134,7 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
         ) {
 
             // ---------------- CAMPO A ----------------
-            Text("Punto A", color = Color.Black)
+            Text("Punto A", color = MaterialTheme.colorScheme.onSurface)
 
             OutlinedTextField(
                 value = puntoA,
@@ -141,15 +143,15 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
                     searchPlace(it) { results -> suggestionsA = results }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Buscar dirección…", color = Color.Gray) },
+                placeholder = { Text("Buscar dirección…") },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF0065C2),
-                    unfocusedBorderColor = Color.Gray,
-                    cursorColor = Color.Black,
-                    focusedTextColor = Color.Black,
-                    unfocusedTextColor = Color.Black,
-                    focusedPlaceholderColor = Color.Gray,
-                    unfocusedPlaceholderColor = Color.Gray
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    cursorColor = MaterialTheme.colorScheme.onSurface,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             )
 
@@ -160,17 +162,21 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
                         suggestionsA = emptyList()
                         focusManager.clearFocus()
 
-                        fetchLatLng(suggestion) { puntoALatLng = it }
+                        // obtener lat/lng y nombre de la calle (route) y guardarlo en el ViewModel
+                        fetchPlaceDetails(suggestion) { latLng, routeName ->
+                            puntoALatLng = latLng
+
+                        }
                     }
                 ) {
-                    Text(suggestion.getFullText(null).toString(), color = Color.Black)
+                    Text(suggestion.getFullText(null).toString(), color = MaterialTheme.colorScheme.onSurface)
                 }
             }
 
             Spacer(Modifier.height(20.dp))
 
             // ---------------- CAMPO B ----------------
-            Text("Punto B", color = Color.Black)
+            Text("Punto B", color = MaterialTheme.colorScheme.onSurface)
 
             OutlinedTextField(
                 value = puntoB,
@@ -179,15 +185,15 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
                     searchPlace(it) { results -> suggestionsB = results }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Buscar dirección…", color = Color.Gray) },
+                placeholder = { Text("Buscar dirección…") },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF0065C2),
-                    unfocusedBorderColor = Color.Gray,
-                    cursorColor = Color.Black,
-                    focusedTextColor = Color.Black,
-                    unfocusedTextColor = Color.Black,
-                    focusedPlaceholderColor = Color.Gray,
-                    unfocusedPlaceholderColor = Color.Gray
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    cursorColor = MaterialTheme.colorScheme.onSurface,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             )
 
@@ -197,10 +203,14 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
                         puntoB = suggestion.getFullText(null).toString()
                         suggestionsB = emptyList()
                         focusManager.clearFocus()
-                        fetchLatLng(suggestion) { puntoBLatLng = it }
+
+                        fetchPlaceDetails(suggestion) { latLng, routeName ->
+                            puntoBLatLng = latLng
+
+                        }
                     }
                 ) {
-                    Text(suggestion.getFullText(null).toString(), color = Color.Black)
+                    Text(suggestion.getFullText(null).toString(), color = MaterialTheme.colorScheme.onSurface)
                 }
             }
 
@@ -258,8 +268,11 @@ fun NewReportScreen(navController: NavController, segmentViewModel: SegmentViewM
             // ---------------- BOTÓN ----------------
             Button(
                 onClick = {
+                    // Guardar coordenadas y nombres en el ViewModel (fallback si no se resolvió antes)
                     segmentViewModel.puntoA = puntoALatLng
                     segmentViewModel.puntoB = puntoBLatLng
+                    segmentViewModel.nombreCalleA = puntoA
+                    segmentViewModel.nombreCalleB = puntoB
                     navController.navigate("reportScreen") },
 
                 colors = ButtonDefaults.buttonColors(

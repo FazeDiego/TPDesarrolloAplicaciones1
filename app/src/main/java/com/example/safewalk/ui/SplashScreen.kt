@@ -115,6 +115,8 @@ fun SplashScreen(onStartClick: () -> Unit) {
             ),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(bottom = 10.dp)
                 .size(80.dp)
         ) {
             Icon(

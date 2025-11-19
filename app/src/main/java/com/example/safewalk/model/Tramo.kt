@@ -10,7 +10,9 @@ data class Tramo(
     val puntoB: GeoPoint = GeoPoint(0.0, 0.0),
     val usuarioId: String = "",
     var ratingPromedio: Double = 0.0,
-    var cantidadReviews: Int = 0
+    var cantidadReviews: Int = 0,
+    var nombreCalleA: String = "",
+    var nombreCalleB: String = ""
 )
 
 
@@ -20,6 +22,7 @@ fun guardarTramo(tramo: Tramo, onSuccess: (String) -> Unit, onFailure: (Exceptio
     val nuevoDoc = db.collection("tramos").document()
 
     tramo.uuid = nuevoDoc.id
+
 
     nuevoDoc
         .set(tramo)

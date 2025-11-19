@@ -4,9 +4,12 @@ import com.google.firebase.Timestamp
 import java.util.Date
 
 data class Review(
-    val comentario: String = "",
-    val fecha: Timestamp = Timestamp(Date()),
-    val rating: Int = 0,
-    val tramoId: String = "",
-    val usuarioId: String = ""
+    var comentario: String = "",
+    var fecha: Timestamp = Timestamp(Date()),
+    var rating: Int = 0,
+    var tramoId: String = "",
+    var usuarioId: String = "",
+    var id: String = "",
+    var fotoBase64: String? = null
 )
+

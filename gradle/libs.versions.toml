@@ -1,5 +1,5 @@
 [versions]
-agp = "8.13.0"
+agp = "8.13.1"
 kotlin = "2.0.21"
 coreKtx = "1.10.1"
 junit = "4.13.2"
@@ -15,6 +15,7 @@ uiTextVersion = "1.9.4"
 compiler = "3.2.0-alpha11"
 playServicesLocation = "21.3.0"
 foundation = "1.9.4"
+foundationLayout = "1.9.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -38,6 +39,7 @@ androidx-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.re
 androidx-compiler = { group = "androidx.databinding", name = "compiler", version.ref = "compiler" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

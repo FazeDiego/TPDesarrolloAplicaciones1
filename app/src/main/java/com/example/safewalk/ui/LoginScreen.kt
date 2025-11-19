@@ -43,6 +43,10 @@ fun LoginScreen(navController: NavController) {
     var passwordVisible by rememberSaveable  { mutableStateOf(false) }
     val auth = FirebaseAuth.getInstance()
 
+    // Estados para recuperar contraseña
+    var showResetPasswordDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -205,11 +209,90 @@ fun LoginScreen(navController: NavController) {
                         color = Color("#0065C2".toColorInt()),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.clickable {
-                            navController.navigate("loginScreen")
+                            showResetPasswordDialog = true
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Text(
+                        text = "¿No tenes una cuenta de Safe Walk? Registrate",
+                        color = Color("#0065C2".toColorInt()),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.clickable {
+                            navController.navigate("registerScreen")
                         }
                     )
 
                     Spacer(modifier = Modifier.height(40.dp)) // 👈 evita cortes al final
+                }
+
+                // Diálogo para recuperar contraseña
+                if (showResetPasswordDialog) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            showResetPasswordDialog = false
+                            resetEmail = ""
+                        },
+                        title = { Text("Recuperar contraseña") },
+                        text = {
+                            Column {
+                                Text("Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.")
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = resetEmail,
+                                    onValueChange = { resetEmail = it },
+                                    label = { Text("Correo electrónico") },
+                                    placeholder = { Text("correo@ejemplo.com") },
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Email
+                                    ),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    if (resetEmail.isBlank()) {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Por favor ingresa tu correo")
+                                        }
+                                    } else {
+                                        auth.sendPasswordResetEmail(resetEmail)
+                                            .addOnCompleteListener { task ->
+                                                if (task.isSuccessful) {
+                                                    scope.launch {
+                                                        snackbarHostState.showSnackbar(
+                                                            "Correo enviado. Revisa tu bandeja de entrada"
+                                                        )
+                                                    }
+                                                    showResetPasswordDialog = false
+                                                    resetEmail = ""
+                                                } else {
+                                                    scope.launch {
+                                                        snackbarHostState.showSnackbar(
+                                                            task.exception?.message ?: "Error al enviar correo"
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                    }
+                                }
+                            ) {
+                                Text("Enviar")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                showResetPasswordDialog = false
+                                resetEmail = ""
+                            }) {
+                                Text("Cancelar")
+                            }
+                        }
+                    )
                 }
             }
         }

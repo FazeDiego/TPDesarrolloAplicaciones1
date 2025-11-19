@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,20 +34,31 @@ import androidx.core.graphics.toColorInt
 import androidx.navigation.NavController
 import com.example.safewalk.R
 import com.example.safewalk.data.FirestoreRepository
+import com.example.safewalk.data.TramoCache
 import com.example.safewalk.model.Tramo
+import com.example.safewalk.viewmodel.ThemeViewModel
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.maps.android.compose.*
+import com.example.safewalk.data.network.snapToRoads
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavController) {
+fun HomeScreen(
+    navController: NavController,
+    themeViewModel: ThemeViewModel,
+    targetLat: Double? = null,
+    targetLng: Double? = null,
+    targetZoom: Float? = null
+) {
 
     val context = LocalContext.current
+    val isDarkTheme by themeViewModel.isDarkTheme.collectAsState()
     val fusedLocationClient = remember {
         LocationServices.getFusedLocationProviderClient(context)
     }
@@ -60,11 +73,16 @@ fun HomeScreen(navController: NavController) {
     val repo = remember { FirestoreRepository() }
     var tramos by remember { mutableStateOf<List<Tramo>>(emptyList()) }
 
+    fun refreshTramos() {
+    TramoCache.clear()
+        repo.obtenerTramosConReviewsUsuario(userId) { list ->
+            tramos = list }
+    }
+
+
     // cargar tramos
     LaunchedEffect(userId) {
-        repo.obtenerTramosUsuario(userId) { list ->
-            tramos = list
-        }
+       refreshTramos()
     }
 
     // permisos
@@ -106,11 +124,21 @@ fun HomeScreen(navController: NavController) {
     val cameraPositionState = rememberCameraPositionState()
 
     // mover la cámara cuando llega la ubicación
-    LaunchedEffect(userLocation) {
-        userLocation?.let { loc ->
-            cameraPositionState.move(
-                CameraUpdateFactory.newLatLngZoom(loc, 15f)
+    LaunchedEffect(userLocation, targetLat, targetLng) {
+        // Priorizar ubicación objetivo si está disponible
+        if (targetLat != null && targetLng != null) {
+            val targetLocation = LatLng(targetLat, targetLng)
+            val zoom = targetZoom ?: 17f
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(targetLocation, zoom),
+                durationMs = 1000
             )
+        } else {
+            userLocation?.let { loc ->
+                cameraPositionState.move(
+                    CameraUpdateFactory.newLatLngZoom(loc, 15f)
+                )
+            }
         }
     }
 
@@ -127,38 +155,51 @@ fun HomeScreen(navController: NavController) {
                         "Mapa",
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
-                        color = Color.Black
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
                     Image(
                         painter = painterResource(R.drawable.logo),
-                        contentDescription = "Logo",
+                        contentDescription = "Logo de SafeWalk",
                         modifier = Modifier.size(48.dp)
                     )
                 },
-                colors = TopAppBarDefaults.mediumTopAppBarColors(containerColor = Color.White)
+                actions = {
+                    IconButton(onClick = { themeViewModel.toggleTheme(context) }) {
+                        Icon(
+                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = if (isDarkTheme) "Cambiar a modo claro" else "Cambiar a modo oscuro"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = Color.White) {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            ) {
                 NavigationBarItem(
                     selected = true,
                     onClick = {},
-                    icon = { Icon(Icons.Default.Map, contentDescription = "Mapa") },
-                    label = { Text("Mapa") }
+                    icon = { Icon(Icons.Default.Map, contentDescription = "Navegar a Mapa") },
+                    label = { Text("Mapa", fontSize = 12.sp) }
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = { navController.navigate("reportScreen") },
-                    icon = { Icon(Icons.Default.Checklist, contentDescription = "Reportes") },
-                    label = { Text("Reportes") }
+                    onClick = { navController.navigate("reportsScreen") },
+                    icon = { Icon(Icons.Default.Checklist, contentDescription = "Navegar a Reportes") },
+                    label = { Text("Reportes", fontSize = 12.sp) }
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = {},
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Perfil") },
-                    label = { Text("Perfil") }
+                    onClick = { navController.navigate("profileScreen") },
+                    icon = { Icon(Icons.Default.Person, contentDescription = "Navegar a Perfil") },
+                    label = { Text("Perfil", fontSize = 12.sp) }
                 )
             }
         },
@@ -166,69 +207,100 @@ fun HomeScreen(navController: NavController) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFEFEFEF))
+                    .background(MaterialTheme.colorScheme.background)
                     .padding(padding)
             ) {
 
-                // mapa
+
+
                 GoogleMap(
+
+
                     modifier = Modifier.fillMaxSize(),
                     cameraPositionState = cameraPositionState,
-                    properties = MapProperties(isMyLocationEnabled = userLocation != null)
+                    properties = MapProperties(
+                        isMyLocationEnabled = userLocation != null,
+                        mapStyleOptions = if (isDarkTheme) {
+                            MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark)
+                        } else {
+                            MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_light)
+                        }
+                    ),
+                    uiSettings = MapUiSettings(
+                        zoomControlsEnabled = true,
+                        myLocationButtonEnabled = true
+                    ),
+                    contentPadding = PaddingValues(bottom = 100.dp, end = 16.dp)
                 ) {
 
-                    tramos.forEach { tramo ->
-                        val pA = LatLng(tramo.puntoA.latitude, tramo.puntoA.longitude)
-                        val pB = LatLng(tramo.puntoB.latitude, tramo.puntoB.longitude)
-
-                        val (colorLinea, etiqueta) = tramoVisual(tramo.ratingPromedio)
-
-                        // Línea entre A y B
-                        Polyline(
-                            points = listOf(pA, pB),
-                            color = colorLinea,
-                            width = 8f,
-                            geodesic = true
-                        )
-
-                        // Marcadores suaves
-                        Circle(
-                            center = pA,
-                            radius = 25.0,
-                            strokeColor = Color.Transparent,
-                            fillColor = colorLinea.copy(alpha = 0.6f)
-                        )
-                        Circle(
-                            center = pB,
-                            radius = 25.0,
-                            strokeColor = Color.Transparent,
-                            fillColor = colorLinea.copy(alpha = 0.6f)
-                        )
-
-                        // Texto encima de la línea (en el punto medio)
-                        val midLat = (pA.latitude + pB.latitude) / 2
-                        val midLng = (pA.longitude + pB.longitude) / 2
-                        val midPoint = LatLng(midLat, midLng)
 
 
-// Elegir color del chip según el tramo
+                    if (tramos.isNotEmpty()) {
+                        tramos.forEach { tramo ->
 
-                        val chipColor = when (tramo.ratingPromedio) {
-                            in 0.0..2.0 -> android.graphics.Color.RED
-                            in 2.1..4.0 -> android.graphics.Color.YELLOW
-                            else -> android.graphics.Color.GREEN
+                            LaunchedEffect(userId) {
+                                refreshTramos()
+                            }
+
+
+                            val pA = LatLng(tramo.puntoA.latitude, tramo.puntoA.longitude)
+                            val pB = LatLng(tramo.puntoB.latitude, tramo.puntoB.longitude)
+
+                            val rating = tramo.ratingPromedio
+                            val (colorLinea, etiqueta) = tramoVisual(rating)
+
+                            var snappedPoints by remember(tramo.uuid) { mutableStateOf<List<LatLng>>(emptyList()) }
+
+                            val apiKey = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjU2NWI0OGM0M2I4NDRkMmFhZWRiOWE3ZjZlYzYyNzNhIiwiaCI6Im11cm11cjY0In0="
+
+                            LaunchedEffect(tramo.uuid) {
+                                snappedPoints = snapToRoads(pA, pB, apiKey)
+                            }
+
+                            Polyline(
+                                points = if (snappedPoints.isNotEmpty()) snappedPoints else listOf(pA, pB),
+                                color = colorLinea,
+                                width = 8f,
+                                geodesic = true
+                            )
+
+                            Circle(
+                                center = pA,
+                                radius = 25.0,
+                                strokeColor = Color.Transparent,
+                                fillColor = colorLinea.copy(alpha = 0.6f)
+                            )
+
+                            Circle(
+                                center = pB,
+                                radius = 25.0,
+                                strokeColor = Color.Transparent,
+                                fillColor = colorLinea.copy(alpha = 0.6f)
+                            )
+
+                            val midPoint = LatLng(
+                                (pA.latitude + pB.latitude) / 2,
+                                (pA.longitude + pB.longitude) / 2
+                            )
+
+                            val chipColor = when {
+                                rating >= 4.0 -> android.graphics.Color.GREEN          // 4.0–5.0
+                                rating >= 2.0 -> android.graphics.Color.parseColor("#FFA500") // 2.0–3.9
+                                rating > 0.0 -> android.graphics.Color.RED            // 0.0–1.9
+                                else -> android.graphics.Color.GRAY                    // fallback
+                            }
+
+                            val labelBitmap = styledTextBitmap(etiqueta, backgroundColor = chipColor)
+
+                            Marker(
+                                state = MarkerState(position = midPoint),
+                                icon = BitmapDescriptorFactory.fromBitmap(labelBitmap)
+                            )
                         }
-
-// Crear bitmap del label
-                        val labelBitmap = styledTextBitmap(etiqueta, backgroundColor = chipColor)
-
-                        Marker(
-                            state = MarkerState(position = midPoint),
-                            icon = BitmapDescriptorFactory.fromBitmap(labelBitmap)
-                        )
                     }
-
                 }
+
+
 
                 // botón flotante
                 Button(
@@ -270,9 +342,10 @@ fun getUserLocation(
 
 fun tramoVisual(ratingPromedio: Double): Pair<Color, String> {
     return when {
-        ratingPromedio <= 2.0 -> Color.Red to "Muy Peligroso"
-        ratingPromedio <= 4.0 -> Color.Yellow to "Inseguro"
-        else -> Color.Green to "Seguro"
+        ratingPromedio >= 4.0 -> Color.Green to "Seguro"            // 4.0 - 5.0
+        ratingPromedio >= 2.0 -> Color(0xFFFFA500) to "Inseguro"    // 2.0 - 3.9
+        ratingPromedio > 0.0 -> Color.Red to "Muy Peligroso"       // 0.0 - 1.9
+        else -> Color.Gray to "Cargando..."                         // fallback
     }
 }
 
@@ -311,4 +384,3 @@ fun styledTextBitmap(
 
     return bitmap
 }
-

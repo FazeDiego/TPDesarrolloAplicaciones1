@@ -71,6 +71,7 @@ dependencies {
     implementation("org.osmdroid:osmdroid-android:6.1.16")
     implementation(libs.play.services.location)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.foundation.layout)
 
     // Testing
     testImplementation("junit:junit:4.13.2")
@@ -93,6 +94,12 @@ dependencies {
 
     // Firebase Auth
     implementation("com.google.firebase:firebase-auth-ktx")
+
+    // Firebase Storage
+    implementation("com.google.firebase:firebase-storage-ktx")
+
+    // Coil for image loading in Compose
+    implementation("io.coil-kt:coil-compose:2.4.0")
 
 
 

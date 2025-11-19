@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -127,6 +128,8 @@ fun OnboardingScreen2(onNextClick: () -> Unit) {
             ),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(bottom = 10.dp)
                 .size(80.dp)
         ) {
             Icon(

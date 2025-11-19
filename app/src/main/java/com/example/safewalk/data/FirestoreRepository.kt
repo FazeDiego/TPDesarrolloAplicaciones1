@@ -1,13 +1,39 @@
 package com.example.safewalk.data
 
 import android.location.Location
+import android.net.Uri
 import android.util.Log
 import com.example.safewalk.model.Review
 import com.example.safewalk.model.Tramo
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldPath
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.FirebaseStorage
+
+// Cache global para tramos
+object TramoCache {
+    private var cachedTramos: List<Tramo>? = null
+    private var lastFetch: Long = 0
+    private const val CACHE_DURATION = 5 * 60 * 1000L // 5 minutos
+
+    fun get(): List<Tramo>? {
+        val now = System.currentTimeMillis()
+        return if (now - lastFetch < CACHE_DURATION) cachedTramos else null
+    }
+
+    fun set(tramos: List<Tramo>) {
+        cachedTramos = tramos
+        lastFetch = System.currentTimeMillis()
+    }
+
+    fun clear() {
+        cachedTramos = null
+        lastFetch = 0
+    }
+}
 
 class FirestoreRepository {
 
@@ -39,7 +65,12 @@ class FirestoreRepository {
                     if (t != null) {
                         val distA = distanciaMetros(t.puntoA, puntoA)
                         val distB = distanciaMetros(t.puntoB, puntoB)
-                        distA < 10 && distB < 10       // regla definida por vos
+
+                        val distARev = distanciaMetros(t.puntoA, puntoB)
+                        val distBRev = distanciaMetros(t.puntoB, puntoA)
+
+                        // Consideramos tramo igual si coincide normal o invertido
+                        (distA < 10 && distB < 10) || (distARev < 10 && distBRev < 10)
                     } else false
                 }
 
@@ -49,6 +80,7 @@ class FirestoreRepository {
                 onResult(null)
             }
     }
+
 
     // ---------------------------------------------------
     // 3) Guardar tramo — devuelve ID generado
@@ -74,16 +106,22 @@ class FirestoreRepository {
     // ---------------------------------------------------
     // 4) Guardar review
     // ---------------------------------------------------
-    fun guardarReview(review: Review, onResult: (Boolean) -> Unit) {
-        db.collection("reviews")
-            .add(review)
+    fun guardarReview(review: Review, callback: (String?) -> Unit) {
+        val db = FirebaseFirestore.getInstance()
+        val docRef = db.collection("reviews").document()
+
+        // colocar id en la review
+        review.id = docRef.id
+
+        docRef.set(review)
             .addOnSuccessListener {
-                onResult(true)
+                callback(docRef.id)
             }
             .addOnFailureListener {
-                onResult(false)
+                callback(null)
             }
     }
+
 
     // ------------------------------------------------------------------
     // 5) Actualizar estadísticas (promedio y cantidad) — TRANSACTION
@@ -117,27 +155,45 @@ class FirestoreRepository {
         }
     }
 
-    fun obtenerTramosUsuario(userId: String, onResult: (List<Tramo>) -> Unit) {
+    fun obtenerTramosConReviewsUsuario(userId: String, onResult: (List<Tramo>) -> Unit) {
+        // Intentar obtener del cache primero
+        TramoCache.get()?.let {
+            onResult(it)
+            return
+        }
+
         val db = Firebase.firestore
 
-        db.collection("tramos")
+        // Paso 1: obtener todas las reviews del usuario
+        db.collection("reviews")
             .whereEqualTo("usuarioId", userId)
             .get()
-            .addOnSuccessListener { result ->
-                val lista = result.documents.mapNotNull { doc ->
-                    doc.toObject(Tramo::class.java)?.apply {
-
-                        // Guardamos el ID real del documento
-                        uuid = doc.id
-
-                        // Defaults por si no existen los campos
-                        val data = doc.data ?: emptyMap()
-                        ratingPromedio = (data["ratingPromedio"] as? Double) ?: 0.0
-                        cantidadReviews = (data["cantidadReviews"] as? Long)?.toInt() ?: 0
-                    }
+            .addOnSuccessListener { reviewsSnapshot ->
+                val tramoIds = reviewsSnapshot.documents.mapNotNull { it.getString("tramoId") }.distinct()
+                if (tramoIds.isEmpty()) {
+                    onResult(emptyList())
+                    return@addOnSuccessListener
                 }
 
-                onResult(lista)
+                // Paso 2: obtener los tramos correspondientes
+                db.collection("tramos")
+                    .whereIn(FieldPath.documentId(), tramoIds)
+                    .get()
+                    .addOnSuccessListener { tramosSnapshot ->
+                        val lista = tramosSnapshot.documents.mapNotNull { doc ->
+                            doc.toObject(Tramo::class.java)?.apply {
+                                uuid = doc.id
+                                val data = doc.data ?: emptyMap()
+                                ratingPromedio = (data["ratingPromedio"] as? Double) ?: 0.0
+                                cantidadReviews = (data["cantidadReviews"] as? Long)?.toInt() ?: 0
+                            }
+                        }
+                        TramoCache.set(lista) // Guardar en cache
+                        onResult(lista)
+                    }
+                    .addOnFailureListener {
+                        onResult(emptyList())
+                    }
             }
             .addOnFailureListener {
                 onResult(emptyList())
@@ -145,4 +201,185 @@ class FirestoreRepository {
     }
 
 
+    // ---------------------------------------------------
+    // Obtener datos de un usuario por uid
+    // ---------------------------------------------------
+    fun obtenerUsuario(userId: String, onResult: (com.example.safewalk.model.Usuario?) -> Unit) {
+        db.collection("usuarios").document(userId)
+            .get()
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    val usuario = doc.toObject(com.example.safewalk.model.Usuario::class.java)
+                    onResult(usuario)
+                } else {
+                    onResult(null)
+                }
+            }
+            .addOnFailureListener {
+                onResult(null)
+            }
+    }
+
+    // ---------------------------------------------------
+    // Obtener reviews de un usuario
+    // ---------------------------------------------------
+    fun obtenerReviewsUsuario(userId: String, onResult: (List<com.example.safewalk.model.Review>) -> Unit) {
+        db.collection("reviews")
+            .whereEqualTo("usuarioId", userId)
+            .get()
+            .addOnSuccessListener { result ->
+                val lista = result.documents.mapNotNull { doc ->
+                    doc.toObject(com.example.safewalk.model.Review::class.java)?.apply {
+                        // guardar el id del documento para operaciones futuras
+                        id = doc.id
+                    }
+                }
+                onResult(lista)
+            }
+            .addOnFailureListener {
+                onResult(emptyList())
+            }
+    }
+
+    // ---------------------------------------------------
+    // Actualizar review (comentario + rating) y recalcular estadísticas del tramo
+    // ---------------------------------------------------
+    fun actualizarReview(reviewId: String, newComentario: String, newRating: Int, tramoId: String, onResult: (Boolean) -> Unit) {
+        val ref = db.collection("reviews").document(reviewId)
+        ref.update(mapOf("comentario" to newComentario, "rating" to newRating))
+            .addOnSuccessListener {
+                // recalcular estadísticas del tramo
+                recalcularEstadisticasTramo(tramoId)
+                onResult(true)
+            }
+            .addOnFailureListener { e ->
+                Log.e("Firestore", "Error actualizando review", e)
+                onResult(false)
+            }
+    }
+
+    // ---------------------------------------------------
+    // Eliminar review y recalcular estadísticas del tramo
+    // ---------------------------------------------------
+    fun eliminarReview(reviewId: String, tramoId: String, onResult: (Boolean) -> Unit) {
+        db.collection("reviews").document(reviewId)
+            .delete()
+            .addOnSuccessListener {
+                recalcularEstadisticasTramo(tramoId)
+                onResult(true)
+            }
+            .addOnFailureListener { e ->
+                Log.e("Firestore", "Error eliminando review", e)
+                onResult(false)
+            }
+    }
+
+    // ---------------------------------------------------
+    // Recalcular promedio y cantidad de reviews para un tramo
+    // ---------------------------------------------------
+    fun recalcularEstadisticasTramo(tramoId: String) {
+        val tramoRef = db.collection("tramos").document(tramoId)
+        val reviewsRef = db.collection("reviews").whereEqualTo("tramoId", tramoId)
+
+        reviewsRef.get().addOnSuccessListener { snapshot ->
+            val reviews = snapshot.toObjects(Review::class.java)
+            if (reviews.isEmpty()) {
+                // No quedan reviews → eliminar el tramo
+                tramoRef.delete()
+            } else {
+                // Recalcular promedio y cantidad
+                val cantidad = reviews.size
+                val promedio = reviews.map { it.rating }.average()
+                tramoRef.update(
+                    mapOf(
+                        "cantidadReviews" to cantidad,
+                        "ratingPromedio" to promedio
+                    )
+                )
+            }
+        }
+    }
+
+
+    // ---------------------------------------------------
+    // Obtener un tramo por id
+    // ---------------------------------------------------
+    fun obtenerTramoPorId(tramoId: String, onResult: (com.example.safewalk.model.Tramo?) -> Unit) {
+        db.collection("tramos").document(tramoId)
+            .get()
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    val tramo = doc.toObject(com.example.safewalk.model.Tramo::class.java)
+                    // asegurarse de guardar el id real
+                    tramo?.uuid = doc.id
+                    onResult(tramo)
+                } else onResult(null)
+            }
+            .addOnFailureListener {
+                onResult(null)
+            }
+    }
+
+    // ---------------------------------------------------
+    // Actualizar campo nombre en documento usuario
+    // ---------------------------------------------------
+    fun actualizarNombreUsuario(userId: String, nuevoNombre: String, onResult: (Boolean) -> Unit) {
+        db.collection("usuarios").document(userId)
+            .update(mapOf("nombre" to nuevoNombre))
+            .addOnSuccessListener { onResult(true) }
+            .addOnFailureListener { onResult(false) }
+    }
+
+    /**
+     * Guarda un timestamp indicando cuándo se cambió la contraseña por última vez.
+     * Útil para auditoría o forzar re-logins si es necesario.
+     */
+    fun actualizarPasswordTimestamp(userId: String, onResult: (Boolean) -> Unit) {
+        val ahora = com.google.firebase.Timestamp.now()
+        db.collection("usuarios").document(userId)
+            .update(mapOf("lastPasswordChange" to ahora))
+            .addOnSuccessListener { onResult(true) }
+            .addOnFailureListener { onResult(false) }
+    }
+
+    fun subirFotoReview(uri: Uri, callback: (String?) -> Unit) {
+        val storageRef = FirebaseStorage.getInstance().reference
+        val fileRef = storageRef.child("reviews/${System.currentTimeMillis()}.jpg")
+
+        fileRef.putFile(uri)
+            .addOnSuccessListener {
+                fileRef.downloadUrl.addOnSuccessListener { url ->
+                    callback(url.toString())
+                }
+            }
+            .addOnFailureListener {
+                callback(null)
+            }
+    }
+
+    fun actualizarIdReview(id: String) {
+        val db = FirebaseFirestore.getInstance()
+        db.collection("reviews")
+            .document(id)
+            .update("id", id)
+    }
+
+
+
+    fun obtenerTodosLosReviews(onResult: (List<Review>) -> Unit) {
+        db.collection("reviews")
+            .get()
+            .addOnSuccessListener { snap ->
+                val list = snap.documents.mapNotNull { it.toObject(Review::class.java) }
+                onResult(list)
+            }
+            .addOnFailureListener { onResult(emptyList()) }
+    }
+
+
+
+
+
 }
+
+

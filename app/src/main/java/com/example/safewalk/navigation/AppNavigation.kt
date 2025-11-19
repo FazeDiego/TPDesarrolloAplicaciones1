@@ -5,15 +5,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.safewalk.ui.*
 import com.example.safewalk.viewmodel.AuthViewModel
 import com.example.safewalk.viewmodel.SegmentViewModel
+import com.example.safewalk.viewmodel.ThemeViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun AppNavigation(
     hasSeenOnboarding: Boolean,
-    isLoggedIn: Boolean                 // 👈 agregado
+    isLoggedIn: Boolean,
+    themeViewModel: ThemeViewModel
 ) {
     val navController = rememberNavController()
     val segmentViewModel: SegmentViewModel = viewModel()
@@ -85,12 +89,47 @@ fun AppNavigation(
             NewReportScreen(navController, segmentViewModel)
         }
 
-        composable("reportSegmentScreen") {
-            ReportSegmentScreen(navController)
+
+
+        composable("reportsScreen") {
+            ReportsScreen(navController)
         }
 
-        composable("home") {
-            HomeScreen(navController)
+        composable(
+            route = "home?lat={lat}&lng={lng}&zoom={zoom}",
+            arguments = listOf(
+                navArgument("lat") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("lng") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("zoom") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val latStr = backStackEntry.arguments?.getString("lat")
+            val lngStr = backStackEntry.arguments?.getString("lng")
+            val zoomStr = backStackEntry.arguments?.getString("zoom")
+
+            val targetLat = latStr?.toDoubleOrNull()
+            val targetLng = lngStr?.toDoubleOrNull()
+            val targetZoom = zoomStr?.toFloatOrNull()
+
+            HomeScreen(
+                navController = navController,
+                themeViewModel = themeViewModel,
+                targetLat = targetLat,
+                targetLng = targetLng,
+                targetZoom = targetZoom
+            )
         }
     }
 }

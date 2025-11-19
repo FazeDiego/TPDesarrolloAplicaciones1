@@ -3,19 +3,29 @@ package com.example.safewalk
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.ViewModelProvider
+import androidx.core.view.WindowCompat
 import com.example.safewalk.navigation.AppNavigation
 import com.example.safewalk.ui.theme.SafeWalkTheme
+import com.example.safewalk.viewmodel.ThemeViewModel
 import com.google.android.libraries.places.api.Places
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
 
+    private lateinit var themeViewModel: ThemeViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         FirebaseApp.initializeApp(this)
 
-        // Inicializamos Google Places (solo una vez)
+        themeViewModel = ViewModelProvider(this)[ThemeViewModel::class.java]
+        themeViewModel.loadTheme(this)
+
         if (!Places.isInitialized()) {
             Places.initialize(
                 applicationContext,
@@ -23,17 +33,33 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        // ⚡ LEER Onboarding solo una vez (SharedPref)
         val hasSeenOnboarding = hasSeenOnboarding()
-
-        // ⚡ Detecta si hay usuario con sesión activa en Firebase
         val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
 
+        // ⬅️ SOLUCIÓN PRINCIPAL
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         setContent {
-            SafeWalkTheme {
+            val isDarkTheme by themeViewModel.isDarkTheme.collectAsState()
+
+            androidx.compose.runtime.SideEffect {
+                val insetsController =
+                    WindowCompat.getInsetsController(window, window.decorView)
+
+                // Cambia color de íconos según tema
+                insetsController.isAppearanceLightStatusBars = !isDarkTheme
+                insetsController.isAppearanceLightNavigationBars = !isDarkTheme
+
+                // Status/NAV bar transparentes sin generar fondos grises
+                window.statusBarColor = android.graphics.Color.TRANSPARENT
+                window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            }
+
+            SafeWalkTheme(darkTheme = isDarkTheme) {
                 AppNavigation(
-                    hasSeenOnboarding = hasSeenOnboarding,
-                    isLoggedIn = isLoggedIn
+                    hasSeenOnboarding,
+                    isLoggedIn,
+                    themeViewModel
                 )
             }
         }
