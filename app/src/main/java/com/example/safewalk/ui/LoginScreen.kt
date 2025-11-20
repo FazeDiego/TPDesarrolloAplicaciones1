@@ -30,6 +30,29 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
+// Función helper para traducir errores de Firebase al español
+private fun getFirebaseErrorMessage(exception: Exception?): String {
+    val errorMessage = exception?.message ?: ""
+    return when {
+        errorMessage.contains("badly formatted", ignoreCase = true) ||
+        errorMessage.contains("invalid-email", ignoreCase = true) ->
+            "El formato del correo electrónico es incorrecto"
+
+        errorMessage.contains("INVALID_LOGIN_CREDENTIALS", ignoreCase = true) ||
+        errorMessage.contains("wrong-password", ignoreCase = true) ||
+        errorMessage.contains("user-not-found", ignoreCase = true) ->
+            "Correo o contraseña incorrectos"
+
+        errorMessage.contains("network", ignoreCase = true) ->
+            "Error de conexión. Verifica tu internet"
+
+        errorMessage.contains("too-many-requests", ignoreCase = true) ->
+            "Demasiados intentos. Intenta más tarde"
+
+        else -> "Error al iniciar sesión. Intenta nuevamente"
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(navController: NavController) {
@@ -49,7 +72,21 @@ fun LoginScreen(navController: NavController) {
 
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(Alignment.Top)
+                    .padding(top = 16.dp)
+            ) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = Color("#D32F2F".toColorInt()),
+                    contentColor = Color.White
+                )
+            }
+        },
         content = { paddingValues ->
             Box(
                 modifier = Modifier
@@ -182,10 +219,10 @@ fun LoginScreen(navController: NavController) {
                                                 popUpTo("loginScreen") { inclusive = true }
                                             }
                                         } else {
-                                            // ERROR → mostrar mensaje
+                                            // ERROR → mostrar mensaje traducido
                                             scope.launch {
                                                 snackbarHostState.showSnackbar(
-                                                    task.exception?.message ?: "Credenciales incorrectas"
+                                                    getFirebaseErrorMessage(task.exception)
                                                 )
                                             }
                                         }
@@ -273,7 +310,7 @@ fun LoginScreen(navController: NavController) {
                                                 } else {
                                                     scope.launch {
                                                         snackbarHostState.showSnackbar(
-                                                            task.exception?.message ?: "Error al enviar correo"
+                                                            getFirebaseErrorMessage(task.exception)
                                                         )
                                                     }
                                                 }
