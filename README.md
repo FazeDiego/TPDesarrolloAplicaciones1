@@ -67,6 +67,8 @@ Elegis un emulador o dispositivo fisico y presionas Run ▶️
 ### Arquitectura de alto nivel
 
 ```mermaid
+graph TD
+
     A[Activity / Composable]
     VM[ViewModel]
     R[Repository]
@@ -81,5 +83,5 @@ Elegis un emulador o dispositivo fisico y presionas Run ▶️
     R --> RDS
     LDS --> CL
     RDS --> FA
-
 ```
+
