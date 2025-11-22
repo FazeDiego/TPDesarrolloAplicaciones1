@@ -48,10 +48,10 @@ Mapa actualizado con reportes en tiempo real.
 - Interfaz totalmente adaptada para modo light/dark.
 
 ## Tecnologias utilizadas
-[![Lengauje: Kotlin]
-[![UI : Compose]
-[![Arquitectura : MVVM + Repository]
-[![Base de datos : Firebase Firestore]
+[![Lengauje: Kotlin]]
+[![UI : Compose]]
+[![Arquitectura : MVVM + Repository]]
+[![Base de datos : Firebase Firestore]]
 
 
 
