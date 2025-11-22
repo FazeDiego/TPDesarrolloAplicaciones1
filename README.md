@@ -47,11 +47,28 @@ Mapa actualizado con reportes en tiempo real.
 
 - Interfaz totalmente adaptada para modo light/dark.
 
+
+## Inicio Rapido
+
+**Prerequisitos:** Android Studio 
+
+```bash
+# clonar el repo
+git clone https://github.com/TU-USUARIO/SafeWalk.git
+
+# sincronizas las dependencias
+File -> Sync Project with Gradle Files
+
+# Ejecutar
+Elegis un emulador o dispositivo fisico y presionas Run ▶️
+```
+
 ## Tecnologias utilizadas
-[![Lengauje: Kotlin]]
-[![UI : Compose]]
+[![Lengauje: Kotlin]([[https://img.shields.io/badge/License-MIT-blue.svg](https://developer.android.com/compose)](https://developer.android.com/kotlin?hl=es-419))]
+[![UI : Compose]([https://img.shields.io/badge/License-MIT-blue.svg](https://developer.android.com/compose))]
 [![Arquitectura : MVVM + Repository]]
-[![Base de datos : Firebase Firestore]]
+[![Base de datos : Firebase Firestore]([[https://img.shields.io/badge/License-MIT-blue.svg](https://developer.android.com/compose)](https://firebase.google.com/))]
+
 
 
 
