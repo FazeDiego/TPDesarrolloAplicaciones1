@@ -54,7 +54,7 @@ Mapa actualizado con reportes en tiempo real.
 
 ```bash
 # clonar el repo
-git clone https://github.com/TU-USUARIO/SafeWalk.git
+git clone https://github.com/TuUsuario/TPDesarrolloAplicaciones1.git
 
 # sincronizas las dependencias
 File -> Sync Project with Gradle Files
