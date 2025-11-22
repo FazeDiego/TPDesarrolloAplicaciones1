@@ -63,12 +63,23 @@ File -> Sync Project with Gradle Files
 Elegis un emulador o dispositivo fisico y presionas Run ▶️
 ```
 
-## Tecnologias utilizadas
-[![Lengauje: Kotlin]([[https://img.shields.io/badge/License-MIT-blue.svg](https://developer.android.com/compose)](https://developer.android.com/kotlin?hl=es-419))]
-[![UI : Compose]([https://img.shields.io/badge/License-MIT-blue.svg](https://developer.android.com/compose))]
-[![Arquitectura : MVVM + Repository]]
-[![Base de datos : Firebase Firestore]([[https://img.shields.io/badge/License-MIT-blue.svg](https://developer.android.com/compose)](https://firebase.google.com/))]
+## Arquitectura
+### Arquitectura de alto nivel
 
+```mermaid
+    A[Activity / Composable]
+    VM[ViewModel]
+    R[Repository]
+    LDS[Local DataSource]
+    CL[Cache Local]
+    RDS[Remote Data Source]
+    FA[Firestore / Auth]
 
+    A --> VM
+    VM --> R
+    R --> LDS
+    R --> RDS
+    LDS --> CL
+    RDS --> FA
 
-
+```
